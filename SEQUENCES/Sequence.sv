@@ -1,78 +1,124 @@
+
 `ifndef APB_SEQUENCE_SV
 `define APB_SEQUENCE_SV
 
-`include "apb_transaction.sv"
+// ===================================
+// APB WRITE SEQUENCE
+// ===================================
 
-////  WRITE SEQUENCE  //////
 
-class apb_wr_seq extends uvm_sequence#(apb_transaction);
-  
-  `uvm_object_utils(apb_wr_seq)
-  
-  apb_transaction txn;
-  
-  function new(string name = "apb_wr_seq");
-    
+class apb_write_sequence extends uvm_sequence #(apb_transaction);
+
+  `uvm_object_utils(apb_write_sequence)
+
+  function new(string name = "apb_write_sequence");
     super.new(name);
-    
   endfunction
-  
+
   task body();
-    
-    repeat(20)
-      
-      begin
-        
-        txn = apb_transaction :: type_id :: create("txn");
-        
-        start_item(txn);
-    
-        assert(txn.randomize() with {P_write == 1;});
-        
-        finish_item(txn);
-        
-        `uvm_info(get_type_name(),txn.convert2string(),UVM_LOW)
-        
-      end
-    
+
+    apb_transaction req;
+
+    `uvm_info("APB_WRITE_SEQ", "Sequence body started", UVM_LOW)
+
+    req = apb_transaction::type_id::create("req");
+
+    `uvm_info("APB_WRITE_SEQ", "Starting start_item", UVM_LOW)
+
+    start_item(req);
+
+    `uvm_info("APB_WRITE_SEQ", "start_item completed", UVM_LOW)
+
+    if (!req.randomize() with {
+      P_write == 1'b1;
+    }) begin
+      `uvm_fatal("APB_WRITE_SEQ", "Transaction randomization failed")
+    end
+
+    `uvm_info("APB_WRITE_SEQ", "Randomization completed", UVM_LOW)
+
+    finish_item(req);
+
+    `uvm_info("APB_WRITE_SEQ", "finish_item completed", UVM_LOW)
+
   endtask
-  
+
 endclass
 
-///    READ SEQUENCE     /////
+// ===================================
+// APB READ SEQUENCE
+// ===================================
 
-class apb_rd_seq extends uvm_sequence#(apb_transaction);
-  
-  `uvm_object_utils(apb_rd_seq)
-  
-  apb_transaction txn;
-  
-  function new(string name = "apb_rd_seq");
-    
+class apb_read_sequence extends uvm_sequence #(apb_transaction);
+
+  `uvm_object_utils(apb_read_sequence)
+
+  function new(string name = "apb_read_sequence");
     super.new(name);
-    
   endfunction
-  
+
   task body();
-    
-    repeat(20)
-      
-      begin
-        
-        txn = apb_transaction :: type_id :: create("txn");
-        
-        start_item(txn);
-    
-        assert(txn.randomize() with {P_write == 0;});
-        
-        finish_item(txn);
-        
-        `uvm_info(get_type_name(),txn.convert2string(),UVM_LOW)
-        
+
+    apb_transaction req;
+
+    repeat (10) begin
+
+      req = apb_transaction::type_id::create("req");
+
+      start_item(req);
+
+      if (!req.randomize() with {
+        P_write == 0;
+        P_addr inside {[0:1023]};
+        P_addr[1:0] == 0;
+      }) begin
+        `uvm_error("APB_READ", "Randomization failed")
       end
-    
+
+      finish_item(req);
+
+    end
+
   endtask
-  
+
+endclass
+
+
+// ===================================
+// APB RANDOM READ/WRITE SEQUENCE
+// ===================================
+
+class apb_random_sequence extends uvm_sequence #(apb_transaction);
+
+  `uvm_object_utils(apb_random_sequence)
+
+  function new(string name = "apb_random_sequence");
+    super.new(name);
+  endfunction
+
+  task body();
+
+    apb_transaction req;
+
+    repeat (20) begin
+
+      req = apb_transaction::type_id::create("req");
+
+      start_item(req);
+
+      if (!req.randomize() with {
+        P_addr inside {[0:1023]};
+        P_addr[1:0] == 0;
+      }) begin
+        `uvm_error("APB_RANDOM", "Randomization failed")
+      end
+
+      finish_item(req);
+
+    end
+
+  endtask
+
 endclass
 
 `endif
