@@ -1,92 +1,97 @@
+
 `ifndef APB_MONITOR_SV
 `define APB_MONITOR_SV
 
-`include "apb_transaction.sv"
-
 class apb_monitor extends uvm_monitor;
-  
+
   `uvm_component_utils(apb_monitor)
-  
-  virtual apb_inf vif;
-  
-   apb_transaction txn;
-  
-  uvm_analysis_port #(apb_transaction) mon_ap;
-  
-  function new(string name = "apb_monitor",uvm_component parent);
-    
-    super.new(name,parent);
-    
-    mon_ap = new("mon_ap",this);
-    
+
+  // Virtual interface
+  virtual apb_interface vif;
+
+  // Analysis port
+  uvm_analysis_port #(apb_transaction) analysis_port;
+
+  // Constructor
+  function new(string name = "apb_monitor",
+               uvm_component parent = null);
+
+    super.new(name, parent);
+
   endfunction
-  
+
+
+  // BUILD PHASE
   function void build_phase(uvm_phase phase);
-    
+
     super.build_phase(phase);
-    
-    if(!uvm_config_db #(virtual apb_inf) :: get(this,"","vif",vif))
-      
-      `uvm_fatal("NO VIF","MONITOR INTERFACE FAILS")
-        
-        endfunction
-      
-      task run_phase (uvm_phase phase);
-    
-    super.run_phase(phase);
-   
-    repeat(20) 
-      
-      begin
-        
-        @(posedge vif.P_clk);
-        
-        // DETECT APB VALID TRANSFER
-        
-        if(vif.P_selx &&
-          vif.P_enable &&
-          vif.P_ready)
-          
-          begin
-            
-            txn = apb_transaction :: type_id :: create("txn",this);
-            
-            //CAPTURE SIGNALS
-            
-            txn.P_addr  = vif.P_addr;
-            
-        	txn.P_write = vif.P_write;
-            
-            if(vif.P_write)
-              
-          		txn.P_wdata = vif.P_wdata;
-            
-       	 	else
-          
-            	txn.P_rdata = vif.P_rdata;
-            
-            //SEND TRANSACTION 
-            
-            mon_ap.write(txn);
-            
-            //PRINT TRANSACTION
-            
-            `uvm_info(get_type_name(),
-          $sformatf("MONITOR : %s",
-          txn.convert2string()),
-          UVM_LOW)
-            
-            `uvm_info("MON","TRANSFER DETECTED",UVM_LOW)
-            
-          end
-        
+
+    analysis_port =
+        new("analysis_port", this);
+
+    if (!uvm_config_db #(virtual apb_interface)::get(
+          this, "", "vif", vif)) begin
+
+      `uvm_fatal("APB_MONITOR",
+                 "Virtual interface not found")
+
+    end
+
+  endfunction
+
+
+  // RUN PHASE
+  task run_phase(uvm_phase phase);
+
+    apb_transaction trans;
+
+    forever begin
+
+      @(posedge vif.P_clk);
+
+      // Wait for reset release
+      if (vif.P_resetn !== 1'b1)
+        continue;
+
+      // Detect completed APB transfer
+      if ((vif.P_selx   === 1'b1) &&
+          (vif.P_enable === 1'b1) &&
+          (vif.P_ready  === 1'b1)) begin
+
+        trans = apb_transaction::type_id::create("trans");
+
+        // Capture transaction
+        trans.P_addr   = vif.P_addr;
+        trans.P_selx   = vif.P_selx;
+        trans.P_enable = vif.P_enable;
+        trans.P_write  = vif.P_write;
+        trans.P_wdata  = vif.P_wdata;
+        trans.P_ready  = vif.P_ready;
+        trans.P_rdata  = vif.P_rdata;
+        trans.P_slverr = vif.P_slverr;
+
+        // Publish transaction
+        analysis_port.write(trans);
+
+        `uvm_info("APB_MONITOR",
+          $sformatf(
+            "ADDR=%0h WRITE=%0b WDATA=%0h RDATA=%0h READY=%0b SLVERR=%0b",
+            trans.P_addr,
+            trans.P_write,
+            trans.P_wdata,
+            trans.P_rdata,
+            trans.P_ready,
+            trans.P_slverr
+          ),
+          UVM_MEDIUM
+        )
+
       end
-    
-    endtask
-    
-    endclass
-      
-    `endif
-      
-        
-        
+
+    end
+
+  endtask
+
+endclass
+
+`endif
