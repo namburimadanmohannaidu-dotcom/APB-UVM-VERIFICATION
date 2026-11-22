@@ -1,93 +1,67 @@
-// Code your testbench here
-// or browse Examples
 
-`ifndef TESTBENCH_TOP_SV
-`define TESTBENCH_TOP_SV
+`timescale 1ns/1ps
 
-`include "Interface.sv"
-
-`include "apb_test.sv"
-
-`include "apb_pkg.sv"
-
-module top();
+ `include "apb_pkg.sv"
   
-  import apb_pkg::*;
-    
+  `include "Interface.sv"
+
+  `include "apb_test.sv"
+
+module top;
+
   bit P_clk;
-  
-  bit P_rst;
-  
-  always #5 P_clk = ~P_clk;
-  
-  apb_inf vif(P_clk);
-  
-  //DUT INSTANCE
+  bit P_resetn;
 
-  AMBA_APB dut(
-  				.P_clk     (vif.P_clk),
-                .P_rst     (vif.P_rst),
-
-                .P_addr    (vif.P_addr),
-                .P_selx    (vif.P_selx),
-                .P_enable  (vif.P_enable),
-                .P_write   (vif.P_write),
-
-                .P_wdata   (vif.P_wdata),
-
-                .P_ready   (vif.P_ready),
-                .P_slverr  (vif.P_slverr),
-                .P_rdata   (vif.P_rdata)
+  apb_interface apb_if (
+    P_clk,
+    P_resetn
   );
-  
-  initial 
-    
-    begin
-      
-      P_rst = 1;
-      
-      repeat(5)@(posedge P_clk);
-      
-      P_rst = 0;
-      
-    end
-  
-  initial 
-    
-    begin
-      
-      uvm_config_db #(virtual apb_inf) :: set(null,"*","vif",vif);
-      
-    end
-  
-  initial 
-    
-    begin
-      
-      run_test("apb_test");
-      
-    end
-  
+
+  AMBA_APB dut (
+    .P_clk     (P_clk),
+    .P_resetn  (P_resetn),
+    .P_addr    (apb_if.P_addr),
+    .P_selx    (apb_if.P_selx),
+    .P_enable  (apb_if.P_enable),
+    .P_write   (apb_if.P_write),
+    .P_wdata   (apb_if.P_wdata),
+    .P_ready   (apb_if.P_ready),
+    .P_rdata   (apb_if.P_rdata),
+    .P_slverr  (apb_if.P_slverr)
+  );
+
+  // Clock generation
   initial begin
+    P_clk = 0;
+    forever #5 P_clk = ~P_clk;
+  end
 
-    $dumpfile("dump.vcd");
-
-    $dumpvars;
-
+  // Reset generation
+  initial begin
+    P_resetn = 0;
+    repeat (5) @(posedge P_clk);
+    @(negedge P_clk);
+    P_resetn = 1;
   end
   
-  initial 
+  // --------------------------------
+// VCD Waveform Dump
+// --------------------------------
+
+initial begin
+    $dumpfile("apb_waveform.vcd");
+    $dumpvars(0, top);
+end
+
+  // UVM start
+  initial begin
+    uvm_config_db #(virtual apb_interface)::set(
+      null, "*", "vif", apb_if
+    );
+
+    run_test("apb_test");
     
-    begin
+    #1000; $finish;
+  end
 
-      #1000;
-
-      $display("TIMEOUT");
-
-      $finish;
-
-	end
-  
 endmodule
-
-`endif
