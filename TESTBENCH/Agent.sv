@@ -1,62 +1,84 @@
+
 `ifndef APB_AGENT_SV
 `define APB_AGENT_SV
 
-`include "apb_sequencer"
-
-`include "apb_driver.sv"
-
-`include "apb_monitor.sv"
-
 class apb_agent extends uvm_agent;
-  
+
   `uvm_component_utils(apb_agent)
-  
-  apb_sequencer seqr;
-  
-  apb_driver	drv;
-  
-  apb_monitor	mon;
-  
-  function new(string name = "apb_agent",uvm_component parent);
-    
-    super.new(name,parent);
-    
+
+  // APB components
+  apb_sequencer sequencer;
+  apb_driver    driver;
+  apb_monitor   monitor;
+
+  // Agent mode
+  uvm_active_passive_enum is_active = UVM_ACTIVE;
+
+
+  // Constructor
+  function new(string name = "apb_agent",
+               uvm_component parent = null);
+
+    super.new(name, parent);
+
   endfunction
-  
-  function void build_phase (uvm_phase phase);
-    
+
+
+  // BUILD PHASE
+  function void build_phase(uvm_phase phase);
+
     super.build_phase(phase);
-    
-    mon = apb_monitor :: type_id :: create("mon",this);
-    
-    //ACTIVE AGENT
-    
-    if(get_is_active() == UVM_ACTIVE)
-      
-      begin
-        
-        drv = apb_driver :: type_id :: create("drv",this);
-        
-        seqr = apb_sequencer :: type_id :: create("seqr",this);
-        
-      end
-    
+
+    // Create monitor in both active and passive modes
+    monitor = apb_monitor::type_id::create(
+                  "monitor", this);
+
+    // Create driver and sequencer only in active mode
+    if (is_active == UVM_ACTIVE) begin
+
+      sequencer = apb_sequencer::type_id::create(
+                      "sequencer", this);
+
+      driver = apb_driver::type_id::create(
+                   "driver", this);
+
+    end
+
   endfunction
+
+
+  // CONNECT PHASE
+  /*function void connect_phase(uvm_phase phase);
+
+    super.connect_phase(phase);
+
+    if (is_active == UVM_ACTIVE) begin
+
+      driver.seq_item_port.connect(
+          sequencer.seq_item_export
+      );
+
+    end
+
+  endfunction*/
   
   function void connect_phase(uvm_phase phase);
-    
-    super.connect_phase(phase);
-    
-    //CONNECT DRIVER AND SEQUENCER
-    
-    if(get_is_active() == UVM_ACTIVE) begin
-      
-      drv.seq_item_port.connect(seqr.seq_item_export);
-      
-    end
-    
-  endfunction
-  
+
+  super.connect_phase(phase);
+
+  if (is_active == UVM_ACTIVE) begin
+
+    driver.seq_item_port.connect(
+      sequencer.seq_item_export
+    );
+
+    `uvm_info("APB_AGENT", "Driver connected to Sequencer", UVM_LOW)
+
+  end
+
+endfunction
+
+
 endclass
-    
-`endif    
+
+`endif
